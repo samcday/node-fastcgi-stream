@@ -23,7 +23,7 @@ var createRecordSanityChecks = function(opts) {
 	if(opts.expectedSize !== undefined) {
 		context["record calculates its size correctly"] = function(record) {
 			assert.equal(record.getSize(), opts.expectedSize);
-		}
+		};
 	};
 	
 	if(opts.expectedType) {
@@ -367,7 +367,7 @@ var createRecordBodyTests = function(record, deferredContentLengthFn) {
 			return tests;
 		}
 	}
-}
+};
 
 var createWriteRecordTest = function(record) {
 	var requestId = Math.floor(Math.random() * 65535 + 1);
