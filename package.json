@@ -1,0 +1,17 @@
+{
+	"name": "fastcgi-stream",
+	"version": "0.1.0",
+	"description": "Fast FastCGI Stream wrapper for reading/writing FCGI records.",
+	"keywords": "fcgi, fastcgi",
+	"author": "Sam Day <sam.c.day@gmail.com>",
+	"main": "./lib/index.js",
+	"engines": { "node": ">= 0.4.0" },
+	"dependencies": {
+		"vows": ">= 0.5.6",
+		"bufferlist": ">= 0.0.6"
+	},
+	"repository" : {
+        "type" : "git",
+         "url" : "https://github.com/samcday/node-fastcgi-stream.git"
+    }
+}
