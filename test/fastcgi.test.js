@@ -228,8 +228,10 @@ vows.describe("FastCGIStream Sanity Checks").addBatch({
 }).export(module);
 
 
-var createFCGIStream = function() {
-	var readableStream = new streamBuffers.ReadableStreamBuffer();
+var createFCGIStream = function(chunkSize) {
+	var readableStream = new streamBuffers.ReadableStreamBuffer({
+		chunkSize: chunkSize || streamBuffers.DEFAULT_CHUNK_SIZE
+	});
 	var writableStream = new streamBuffers.WritableStreamBuffer();
 	
 	var fcgiStream = new fastcgi.FastCGIStream(new DuplexStream(readableStream, writableStream));
@@ -429,9 +431,86 @@ var createWriteRecordTest = function(record) {
 	return context;
 };
 
-var createReadRecordTest = function(theRecord) {
+var addReadRecordTests = function(theRecord, context) {
+	switch(theRecord.TYPE) {
+	case fastcgi.records.BeginRequest.TYPE: {
+		context["*role* is correct"] = function(wtf, requestId, record) {
+			assert.equal(record.role, theRecord.role);
+		};
+		
+		context["*flags* is correct"] = function(wtf, requestId, record) {
+			assert.equal(record.flags, theRecord.flags);
+		};
+
+		break;
+	}
+	
+	case fastcgi.records.EndRequest.TYPE: {
+		context["*appStatus* is correct"] = function(wtf, requestId, record) {
+			assert.equal(record.appStatus, theRecord.appStatus);
+		};
+
+		context["*protocolStatus* is correct"] = function(wtf, requestId, record) {
+			assert.equal(record.protocolStatus, theRecord.protocolStatus);
+		};
+		
+		break;
+	}
+	
+	case fastcgi.records.UnknownType.TYPE: {
+		context["*type* is correct"] = function(wtf, requestId, record) {
+			assert.equal(record.type, theRecord.type);
+		};
+
+		break;
+	}
+	
+	case fastcgi.records.StdIn.TYPE:
+	case fastcgi.records.StdOut.TYPE:
+	case fastcgi.records.StdErr.TYPE:
+	case fastcgi.records.Data.TYPE: {
+		context["body data is correct"] = function(wtf, requestId, record) {
+			var originalRecordBuffer = Buffer.isBuffer(theRecord.data) ? theRecord.data : new Buffer(theRecord.data);
+			var actualRecordBuffer = Buffer.isBuffer(record.data) ? record.data : new Buffer(record.data);
+
+			for(var i = 0; i < originalRecordBuffer.length; i++) {
+				assert.equal(actualRecordBuffer[i], originalRecordBuffer[i], "Data at index #" + i + " does not match.");
+			}
+		};
+
+		break;
+	}
+	case fastcgi.records.Params.TYPE:
+	case fastcgi.records.GetValues.TYPE:
+	case fastcgi.records.GetValuesResult.TYPE: {
+		context["params are correct"] = function(wtf, requestId, record) {
+			var theParams = record.params || record.values || record.result;
+			var theRecordParams = theRecord.params || theRecord.values || theRecord.result;
+
+			theParams.forEach(function(param, index) {
+				if(Array.isArray(param)) {
+					assert.equal(param[0], theRecordParams[index][0], "Param at index " + index + " has incorrect key!");
+					assert.equal(param[1], theRecordParams[index][1], "Param at index " + index + " has incorrect value!");
+				}
+				else {
+					assert.equal(param, theRecordParams[index]);
+				}
+			});
+		};
+
+		break;
+	}
+};
+};
+
+var createReadRecordTest = function(chunkSize, theRecord) {
+	if(typeof(chunkSize) !== "number") {
+		theRecord = chunkSize;
+		chunkSize = undefined;
+	}
+	
 	var theRequestId = Math.floor(Math.random() * 65535 + 1);
-	var fastcgiStream = createFCGIStream();
+	var fastcgiStream = createFCGIStream(chunkSize);
 
 	var context = {
 		topic: function() {
@@ -440,7 +519,8 @@ var createReadRecordTest = function(theRecord) {
 			}.bind(this));
 			
 			fastcgiStream.writeRecord(theRequestId, theRecord);
-			fastcgiStream._readableStream.put(fastcgiStream._writableStream.getContents());
+			var buf = fastcgiStream._writableStream.getContents();
+			fastcgiStream._readableStream.put(buf);
 		},
 		
 		// TODO: re-enable this once I've fixed an issue with ReadableStream not reporting correct size inside an emitted data event. 
@@ -457,63 +537,215 @@ var createReadRecordTest = function(theRecord) {
 		}
 	};
 	
-	switch(theRecord.TYPE) {
-		case fastcgi.records.BeginRequest.TYPE: {
-			context["*role* is correct"] = function(wtf, requestId, record) {
-				assert.equal(record.role, theRecord.role);
-			};
-			
-			context["*flags* is correct"] = function(wtf, requestId, record) {
-				assert.equal(record.flags, theRecord.flags);
-			};
-
-			break;
-		}
-	};
+	addReadRecordTests(theRecord, context);
 
 	return context;
 };
 
+var createMultiReadRecordTest = function(constructor) {	
+	var requestIds = [];
+	var records = [];
+	var fastcgiStream = createFCGIStream();
+
+	for(var i = 0; i < 5; i++) {
+		var requestId = Math.floor(Math.random() * 65535 + 1)
+		requestIds.push(requestId);
+
+		var record = constructor();
+		records.push(record);
+		fastcgiStream.writeRecord(requestId, record);
+	}
+
+	var buf = fastcgiStream._writableStream.getContents();
+	
+	var context = {
+		topic: function() {
+			var actualRequestIds = [];
+			var actualRecords = [];
+
+			fastcgiStream.on("record", function(requestId, record) {
+				actualRequestIds.push(requestId);
+				actualRecords.push(record);
+				if(actualRequestIds.length == 5) this.callback(null, actualRequestIds, actualRecords);
+			}.bind(this));
+			
+			fastcgiStream._readableStream.put(buf);
+		}
+	};
+	
+	for(var i = 0; i < 5; i++) {
+
+		context["(record #" + i + ")"] = (function(expectedRequestId, expectedRecord) {
+			var context = {
+				topic: function(actualRequestIds, actualRecords) {
+					this.callback(null, actualRequestIds.shift(), actualRecords.shift());
+				},
+				
+				"*requestId* is correct": function(wtf, requestId) {
+					assert.equal(requestId, expectedRequestId);
+				},
+
+				"record is correct type": function(wtf, requestId, record) {
+					assert.equal(record.TYPE, expectedRecord.TYPE);
+				}
+			};
+			
+			addReadRecordTests(expectedRecord, context);
+			
+			return context;
+		})(requestIds[i], records[i]);
+	}
+	
+	return context;
+};
+
+// Some fixtures.
+var largeByte = 254;
+var largeShort = 0xFFFF;
+var largeInt32 = 4294967295;
+var smallParams = [["Test", "Value"], ["AnotherTest", "AnotherValue"]];
+var largeParams = [["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah"], ["AnotherTest", "AnotherValue"]];
+var smallKeys = ["Test", "Value", "AnotherTest", "AnotherValue"];
+var largeKeys = ["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "AnotherTest", "AnotherValue"]; 
+var basicString = "Basic String";
+var unicodeString = '\u00bd + \u00bc = \u00be';
+
+var createDummyBuffer = function() {
+	var dummyBuffer = new Buffer(1025);
+	for(var i = 0, len = dummyBuffer.length; i < len; i++) {
+		dummyBuffer[i] = Math.floor(Math.random() * 255 + 1);
+	}
+	
+	return dummyBuffer;
+};
+
 vows.describe("FastCGIStream Writing").addBatch({
-	"Writing an FCGI_BEGIN_REQUEST": createWriteRecordTest(new fastcgi.records.BeginRequest(0xFFFF, 254)),
+	"Writing an FCGI_BEGIN_REQUEST": createWriteRecordTest(new fastcgi.records.BeginRequest(largeShort, largeByte)),
 	"Writing an FCGI_ABORT_REQUEST": createWriteRecordTest(new fastcgi.records.AbortRequest()),
-	"Writing an FCGI_END_REQUEST": createWriteRecordTest(new fastcgi.records.EndRequest(4294967295, 254)),
+	"Writing an FCGI_END_REQUEST": createWriteRecordTest(new fastcgi.records.EndRequest(largeInt32, largeByte)),
 	"Writing an FCGI_PARAMS (empty)": createWriteRecordTest(new fastcgi.records.Params()),
-	"Writing an FCGI_PARAMS (small name/value pairs)": createWriteRecordTest(new fastcgi.records.Params([["Test", "Value"], ["AnotherTest", "AnotherValue"]])),
-	"Writing an FCGI_PARAMS (large name/value pairs)": createWriteRecordTest(new fastcgi.records.Params([["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah"], ["AnotherTest", "AnotherValue"]])),
+	"Writing an FCGI_PARAMS (small name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(smallParams)),
+	"Writing an FCGI_PARAMS (large name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(largeParams)),
 	"Writing an FCGI_STDIN (empty)": createWriteRecordTest(new fastcgi.records.StdIn()),
-	"Writing an FCGI_STDIN (string)": createWriteRecordTest(new fastcgi.records.StdIn("Basic String")),
-	"Writing an FCGI_STDIN (unicode string)": createWriteRecordTest(new fastcgi.records.StdIn('\u00bd + \u00bc = \u00be')),
-	"Writing an FCGI_STDIN (buffer)": createWriteRecordTest(new fastcgi.records.StdIn(new Buffer(2048))),
+	"Writing an FCGI_STDIN (string)": createWriteRecordTest(new fastcgi.records.StdIn(basicString)),
+	"Writing an FCGI_STDIN (unicode string)": createWriteRecordTest(new fastcgi.records.StdIn(unicodeString)),
+	"Writing an FCGI_STDIN (buffer)": createWriteRecordTest(new fastcgi.records.StdIn(createDummyBuffer())),
 	"Writing an FCGI_STDOUT (empty)": createWriteRecordTest(new fastcgi.records.StdOut()),
-	"Writing an FCGI_STDOUT (string)": createWriteRecordTest(new fastcgi.records.StdOut("Basic String")),
-	"Writing an FCGI_STDOUT (unicode string)": createWriteRecordTest(new fastcgi.records.StdOut('\u00bd + \u00bc = \u00be')),
-	"Writing an FCGI_STDOUT (buffer)": createWriteRecordTest(new fastcgi.records.StdOut(new Buffer(2048))),
+	"Writing an FCGI_STDOUT (string)": createWriteRecordTest(new fastcgi.records.StdOut(basicString)),
+	"Writing an FCGI_STDOUT (unicode string)": createWriteRecordTest(new fastcgi.records.StdOut(unicodeString)),
+	"Writing an FCGI_STDOUT (buffer)": createWriteRecordTest(new fastcgi.records.StdOut(createDummyBuffer())),
 	"Writing an FCGI_STDERR (empty)": createWriteRecordTest(new fastcgi.records.StdErr()),
-	"Writing an FCGI_STDERR (string)": createWriteRecordTest(new fastcgi.records.StdErr("Basic String")),
-	"Writing an FCGI_STDERR (unicode string)": createWriteRecordTest(new fastcgi.records.StdErr('\u00bd + \u00bc = \u00be')),
-	"Writing an FCGI_STDERR (buffer)": createWriteRecordTest(new fastcgi.records.StdErr(new Buffer(2048))),
+	"Writing an FCGI_STDERR (string)": createWriteRecordTest(new fastcgi.records.StdErr(basicString)),
+	"Writing an FCGI_STDERR (unicode string)": createWriteRecordTest(new fastcgi.records.StdErr(unicodeString)),
+	"Writing an FCGI_STDERR (buffer)": createWriteRecordTest(new fastcgi.records.StdErr(createDummyBuffer())),
 	"Writing an FCGI_DATA (empty)": createWriteRecordTest(new fastcgi.records.Data()),
-	"Writing an FCGI_DATA (string)": createWriteRecordTest(new fastcgi.records.Data("Basic String")),
-	"Writing an FCGI_DATA (unicode string)": createWriteRecordTest(new fastcgi.records.Data('\u00bd + \u00bc = \u00be')),
-	"Writing an FCGI_DATA (buffer)": createWriteRecordTest(new fastcgi.records.Data(new Buffer(2048))),
+	"Writing an FCGI_DATA (string)": createWriteRecordTest(new fastcgi.records.Data(basicString)),
+	"Writing an FCGI_DATA (unicode string)": createWriteRecordTest(new fastcgi.records.Data(unicodeString)),
+	"Writing an FCGI_DATA (buffer)": createWriteRecordTest(new fastcgi.records.Data(createDummyBuffer())),
 	"Writing an FCGI_GET_VALUES (empty)": createWriteRecordTest(new fastcgi.records.GetValues()),
-	"Writing an FCGI_GET_VALUES (small name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValues(["Test", "Value", "AnotherTest", "AnotherValue"])),
-	"Writing an FCGI_GET_VALUES (large name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValues(["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "AnotherTest", "AnotherValue"])),
+	"Writing an FCGI_GET_VALUES (small name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValues(smallKeys)),
+	"Writing an FCGI_GET_VALUES (large name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValues(largeKeys)),
 	"Writing an FCGI_GET_VALUES_RESULT (empty)": createWriteRecordTest(new fastcgi.records.GetValuesResult()),
-	"Writing an FCGI_GET_VALUES_RESULT (small name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValuesResult([["Test", "Value"], ["AnotherTest", "AnotherValue"]])),
-	"Writing an FCGI_GET_VALUES_RESULT (large name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValuesResult([["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah"], ["AnotherTest", "AnotherValue"]])),
-	"Writing an FCGI_UNKNOWN_TYPE": createWriteRecordTest(new fastcgi.records.UnknownType(254))
+	"Writing an FCGI_GET_VALUES_RESULT (small name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValuesResult(smallParams)),
+	"Writing an FCGI_GET_VALUES_RESULT (large name/value pairs)": createWriteRecordTest(new fastcgi.records.GetValuesResult(largeParams)),
+	"Writing an FCGI_UNKNOWN_TYPE": createWriteRecordTest(new fastcgi.records.UnknownType(largeByte))
 }).export(module);
 
 // We're verifying the record reading against records written out by the same system.
-// You might consider this dumb, but I think it's okay, give that we've already run a shiteload of sanity checks on the records.
+// You might consider this dumb, but I think it's okay, given that we've already run a shiteload of sanity checks on the records.
 // And we've tested the raw binary output of the writing process, making sure it's according to spec.
 vows.describe("FastCGIStream Reading").addBatch({
-	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254))
+	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)),
+	"Reading an FCGI_ABORT_REQUEST": createReadRecordTest(new fastcgi.records.AbortRequest()),
+	"Reading an FCGI_END_REQUEST": createReadRecordTest(new fastcgi.records.EndRequest(4294967295, 254)),
+	"Reading an FCGI_PARAMS (empty)": createReadRecordTest(new fastcgi.records.Params()),
+	"Reading an FCGI_PARAMS (small name/value pairs)": createReadRecordTest(new fastcgi.records.Params(smallParams)),
+	"Reading an FCGI_PARAMS (large name/value pairs)": createReadRecordTest(new fastcgi.records.Params(largeParams)),
+	"Reading an FCGI_STDIN (empty)": createReadRecordTest(new fastcgi.records.StdIn()),
+	"Reading an FCGI_STDIN (string)": createReadRecordTest(new fastcgi.records.StdIn(basicString)),
+	"Reading an FCGI_STDIN (unicode string)": createReadRecordTest(new fastcgi.records.StdIn(unicodeString)),
+	"Reading an FCGI_STDIN (buffer)": createReadRecordTest(new fastcgi.records.StdIn(createDummyBuffer())),
+	"Reading an FCGI_STDOUT (empty)": createReadRecordTest(new fastcgi.records.StdOut()),
+	"Reading an FCGI_STDOUT (string)": createReadRecordTest(new fastcgi.records.StdOut(basicString)),
+	"Reading an FCGI_STDOUT (unicode string)": createReadRecordTest(new fastcgi.records.StdOut(unicodeString)),
+	"Reading an FCGI_STDOUT (buffer)": createReadRecordTest(new fastcgi.records.StdOut(createDummyBuffer())),
+	"Reading an FCGI_STDERR (empty)": createReadRecordTest(new fastcgi.records.StdErr()),
+	"Reading an FCGI_STDERR (string)": createReadRecordTest(new fastcgi.records.StdErr(basicString)),
+	"Reading an FCGI_STDERR (unicode string)": createReadRecordTest(new fastcgi.records.StdErr(unicodeString)),
+	"Reading an FCGI_STDERR (buffer)": createReadRecordTest(new fastcgi.records.StdErr(createDummyBuffer())),
+	"Reading an FCGI_DATA (empty)": createReadRecordTest(new fastcgi.records.Data()),
+	"Reading an FCGI_DATA (string)": createReadRecordTest(new fastcgi.records.Data(basicString)),
+	"Reading an FCGI_DATA (unicode string)": createReadRecordTest(new fastcgi.records.Data(unicodeString)),
+	"Reading an FCGI_DATA (buffer)": createReadRecordTest(new fastcgi.records.Data(createDummyBuffer())),
+	"Reading an FCGI_GET_VALUES (empty)": createReadRecordTest(new fastcgi.records.GetValues()),
+	"Reading an FCGI_GET_VALUES (small name/value pairs)": createReadRecordTest(new fastcgi.records.GetValues(smallKeys)),
+	"Reading an FCGI_GET_VALUES (large name/value pairs)": createReadRecordTest(new fastcgi.records.GetValues(largeKeys)),
+	"Reading an FCGI_GET_VALUES_RESULT (empty)": createReadRecordTest(new fastcgi.records.GetValuesResult()),
+	"Reading an FCGI_GET_VALUES_RESULT (small name/value pairs)": createReadRecordTest(new fastcgi.records.GetValuesResult(smallParams)),
+	"Reading an FCGI_GET_VALUES_RESULT (large name/value pairs)": createReadRecordTest(new fastcgi.records.GetValuesResult(largeParams)),
+	"Reading an FCGI_UNKNOWN_TYPE": createReadRecordTest(new fastcgi.records.UnknownType(largeByte))
 }).export(module);
 
-// TODO: sanity checks to make sure you can't write params with name/values larger than 2147483647 bytes (each).
-// TODO: sanity checks to make sure you can't write stdin/stdout/stderr/data records with a body larger than 65535 bytes.
-// TODO: can name/value pairs contain unicode data?
-// TODO: test numerous records coming in on a stream simultaneously.
+vows.describe("FastCGIStream Reading (trickle-fed)").addBatch({
+	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(1, new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)),
+	"Reading an FCGI_ABORT_REQUEST": createReadRecordTest(1, new fastcgi.records.AbortRequest()),
+	"Reading an FCGI_END_REQUEST": createReadRecordTest(1, new fastcgi.records.EndRequest(4294967295, 254)),
+	"Reading an FCGI_PARAMS (empty)": createReadRecordTest(1, new fastcgi.records.Params()),
+	"Reading an FCGI_PARAMS (small name/value pairs)": createReadRecordTest(1, new fastcgi.records.Params(smallParams)),
+	"Reading an FCGI_PARAMS (large name/value pairs)": createReadRecordTest(1, new fastcgi.records.Params(largeParams)),
+	"Reading an FCGI_STDIN (empty)": createReadRecordTest(1, new fastcgi.records.StdIn()),
+	"Reading an FCGI_STDIN (string)": createReadRecordTest(1, new fastcgi.records.StdIn(basicString)),
+	"Reading an FCGI_STDIN (unicode string)": createReadRecordTest(1, new fastcgi.records.StdIn(unicodeString)),
+	"Reading an FCGI_STDIN (buffer)": createReadRecordTest(1, new fastcgi.records.StdIn(createDummyBuffer())),
+	"Reading an FCGI_STDOUT (empty)": createReadRecordTest(1, new fastcgi.records.StdOut()),
+	"Reading an FCGI_STDOUT (string)": createReadRecordTest(1, new fastcgi.records.StdOut(basicString)),
+	"Reading an FCGI_STDOUT (unicode string)": createReadRecordTest(1, new fastcgi.records.StdOut(unicodeString)),
+	"Reading an FCGI_STDOUT (buffer)": createReadRecordTest(1, new fastcgi.records.StdOut(createDummyBuffer())),
+	"Reading an FCGI_STDERR (empty)": createReadRecordTest(1, new fastcgi.records.StdErr()),
+	"Reading an FCGI_STDERR (string)": createReadRecordTest(1, new fastcgi.records.StdErr(basicString)),
+	"Reading an FCGI_STDERR (unicode string)": createReadRecordTest(1, new fastcgi.records.StdErr(unicodeString)),
+	"Reading an FCGI_STDERR (buffer)": createReadRecordTest(1, new fastcgi.records.StdErr(createDummyBuffer())),
+	"Reading an FCGI_DATA (empty)": createReadRecordTest(1, new fastcgi.records.Data()),
+	"Reading an FCGI_DATA (string)": createReadRecordTest(1, new fastcgi.records.Data(basicString)),
+	"Reading an FCGI_DATA (unicode string)": createReadRecordTest(1, new fastcgi.records.Data(unicodeString)),
+	"Reading an FCGI_DATA (buffer)": createReadRecordTest(1, new fastcgi.records.Data(createDummyBuffer())),
+	"Reading an FCGI_GET_VALUES (empty)": createReadRecordTest(1, new fastcgi.records.GetValues()),
+	"Reading an FCGI_GET_VALUES (small name/value pairs)": createReadRecordTest(1, new fastcgi.records.GetValues(smallKeys)),
+	"Reading an FCGI_GET_VALUES (large name/value pairs)": createReadRecordTest(1, new fastcgi.records.GetValues(largeKeys)),
+	"Reading an FCGI_GET_VALUES_RESULT (empty)": createReadRecordTest(1, new fastcgi.records.GetValuesResult()),
+	"Reading an FCGI_GET_VALUES_RESULT (small name/value pairs)": createReadRecordTest(1, new fastcgi.records.GetValuesResult(smallParams)),
+	"Reading an FCGI_GET_VALUES_RESULT (large name/value pairs)": createReadRecordTest(1, new fastcgi.records.GetValuesResult(largeParams)),
+	"Reading an FCGI_UNKNOWN_TYPE": createReadRecordTest(1, new fastcgi.records.UnknownType(largeByte))
+}).export(module);
+
+vows.describe("FastCGIStream Reading (multiple records)").addBatch({
+	"Reading an FCGI_BEGIN_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)}),
+	"Reading an FCGI_ABORT_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.AbortRequest()}),
+	"Reading an FCGI_END_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.EndRequest(4294967295, 254)}),
+	"Reading an FCGI_PARAMS (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.Params()}),
+	"Reading an FCGI_PARAMS (small name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.Params(smallParams)}),
+	"Reading an FCGI_PARAMS (large name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.Params(largeParams)}),
+	"Reading an FCGI_STDIN (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.StdIn()}),
+	"Reading an FCGI_STDIN (string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdIn(basicString)}),
+	"Reading an FCGI_STDIN (unicode string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdIn(unicodeString)}),
+	"Reading an FCGI_STDIN (buffer)": createMultiReadRecordTest(function() { return new fastcgi.records.StdIn(createDummyBuffer())}),
+	"Reading an FCGI_STDOUT (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.StdOut()}),
+	"Reading an FCGI_STDOUT (string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdOut(basicString)}),
+	"Reading an FCGI_STDOUT (unicode string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdOut(unicodeString)}),
+	"Reading an FCGI_STDOUT (buffer)": createMultiReadRecordTest(function() { return new fastcgi.records.StdOut(createDummyBuffer())}),
+	"Reading an FCGI_STDERR (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.StdErr()}),
+	"Reading an FCGI_STDERR (string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdErr(basicString)}),
+	"Reading an FCGI_STDERR (unicode string)": createMultiReadRecordTest(function() { return new fastcgi.records.StdErr(unicodeString)}),
+	"Reading an FCGI_STDERR (buffer)": createMultiReadRecordTest(function() { return new fastcgi.records.StdErr(createDummyBuffer())}),
+	"Reading an FCGI_DATA (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.Data()}),
+	"Reading an FCGI_DATA (string)": createMultiReadRecordTest(function() { return new fastcgi.records.Data(basicString)}),
+	"Reading an FCGI_DATA (unicode string)": createMultiReadRecordTest(function() { return new fastcgi.records.Data(unicodeString)}),
+	"Reading an FCGI_DATA (buffer)": createMultiReadRecordTest(function() { return new fastcgi.records.Data(createDummyBuffer())}),
+	"Reading an FCGI_GET_VALUES (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValues()}),
+	"Reading an FCGI_GET_VALUES (small name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValues(smallKeys)}),
+	"Reading an FCGI_GET_VALUES (large name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValues(largeKeys)}),
+	"Reading an FCGI_GET_VALUES_RESULT (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValuesResult()}),
+	"Reading an FCGI_GET_VALUES_RESULT (small name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValuesResult(smallParams)}),
+	"Reading an FCGI_GET_VALUES_RESULT (large name/value pairs)": createMultiReadRecordTest(function() { return new fastcgi.records.GetValuesResult(largeParams)}),
+	"Reading an FCGI_UNKNOWN_TYPE": createMultiReadRecordTest(function() { return new fastcgi.records.UnknownType(largeByte)})
+}).export(module);
