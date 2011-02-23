@@ -40,6 +40,59 @@ var createRecordSanityChecks = function(opts) {
 };
 
 vows.describe("FastCGIStream Sanity Checks").addBatch({
+	"General constants": {
+		"VERSION": function() {
+			assert.equal(fastcgi.constants.VERSION, 1);
+		},
+		
+		"HEADER_LEN": function() {
+			assert.equal(fastcgi.constants.HEADER_LEN, 8);
+		},
+		
+		"NULL_REQUEST_ID": function() {
+			assert.strictEqual(fastcgi.constants.NULL_REQUEST_ID, 0);
+		}
+	},
+
+	// Check constants.
+	"BeginRequest Role constants": {
+		"RESPONDER": function() {
+			assert.equal(fastcgi.records.BeginRequest.roles.RESPONDER, 1);
+		},
+		
+		"AUTHORIZER": function() {
+			assert.equal(fastcgi.records.BeginRequest.roles.AUTHORIZER, 2);
+		},
+		
+		"FILTER": function() {
+			assert.equal(fastcgi.records.BeginRequest.roles.FILTER, 3);
+		},
+	},
+	
+	"BeginRequest Flags constants": {
+		"KEEP_CONN": function() {
+			assert.equal(fastcgi.records.BeginRequest.flags.KEEP_CONN);
+		}
+	},
+	
+	"EndRequest Protocol Status constants": {
+		"REQUEST_COMPLETE": function() {
+			assert.equal(fastcgi.records.EndRequest.protocolStatus.REQUEST_COMPLETE, 0);
+		},
+
+		"CANT_MPX_CONN": function() {
+			assert.equal(fastcgi.records.EndRequest.protocolStatus.CANT_MPX_CONN, 1);
+		},
+
+		"OVERLOADED": function() {
+			assert.equal(fastcgi.records.EndRequest.protocolStatus.OVERLOADED, 2);
+		},
+
+		"UNKNOWN_ROLE": function() {
+			assert.equal(fastcgi.records.EndRequest.protocolStatus.UNKNOWN_ROLE, 3);
+		}
+	},
+	
 	"BeginRequest": createRecordSanityChecks({
 		class: fastcgi.records.BeginRequest,
 		expectedSize: 8,
@@ -655,7 +708,7 @@ vows.describe("FastCGIStream Writing").addBatch({
 // You might consider this dumb, but I think it's okay, given that we've already run a shiteload of sanity checks on the records.
 // And we've tested the raw binary output of the writing process, making sure it's according to spec.
 vows.describe("FastCGIStream Reading").addBatch({
-	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)),
+	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(new fastcgi.records.BeginRequest(fastcgi.records.BeginRequest.roles.Responder, 254)),
 	"Reading an FCGI_ABORT_REQUEST": createReadRecordTest(new fastcgi.records.AbortRequest()),
 	"Reading an FCGI_END_REQUEST": createReadRecordTest(new fastcgi.records.EndRequest(4294967295, 254)),
 	"Reading an FCGI_PARAMS (empty)": createReadRecordTest(new fastcgi.records.Params()),
@@ -687,7 +740,7 @@ vows.describe("FastCGIStream Reading").addBatch({
 }).export(module);
 
 vows.describe("FastCGIStream Reading (trickle-fed)").addBatch({
-	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(1, new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)),
+	"Reading an FCGI_BEGIN_REQUEST": createReadRecordTest(1, new fastcgi.records.BeginRequest(fastcgi.records.BeginRequest.roles.Responder, 254)),
 	"Reading an FCGI_ABORT_REQUEST": createReadRecordTest(1, new fastcgi.records.AbortRequest()),
 	"Reading an FCGI_END_REQUEST": createReadRecordTest(1, new fastcgi.records.EndRequest(4294967295, 254)),
 	"Reading an FCGI_PARAMS (empty)": createReadRecordTest(1, new fastcgi.records.Params()),
@@ -719,7 +772,7 @@ vows.describe("FastCGIStream Reading (trickle-fed)").addBatch({
 }).export(module);
 
 vows.describe("FastCGIStream Reading (multiple records)").addBatch({
-	"Reading an FCGI_BEGIN_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.BeginRequest(fastcgi.role.Responder, 254)}),
+	"Reading an FCGI_BEGIN_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.BeginRequest(fastcgi.records.BeginRequest.roles.Responder, 254)}),
 	"Reading an FCGI_ABORT_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.AbortRequest()}),
 	"Reading an FCGI_END_REQUEST": createMultiReadRecordTest(function() { return new fastcgi.records.EndRequest(4294967295, 254)}),
 	"Reading an FCGI_PARAMS (empty)": createMultiReadRecordTest(function() { return new fastcgi.records.Params()}),
