@@ -12,7 +12,7 @@ var runTest = function(constructor, num) {
 	});
 	
 	var readStream = new streamBuffers.ReadableStreamBuffer({
-		chunkSize: num * (testRecord.getSize() + 8)
+		//chunkSize: num * (testRecord.getSize() + 8)
 	});
 	
 	var fastcgiStream = new fastcgi.FastCGIStream(new DuplexStream(readStream, writeStream));
@@ -22,29 +22,28 @@ var runTest = function(constructor, num) {
 	}
 	
 	console.log('starting');
-	var running = true;
 	var done = 0;
+	var startTime = null;
 	
 	readStream.pause();
 	readStream.put(writeStream.getContents());
 
 	profiler.resume(profiler.CPU, profiler.HEAP_STATS, profiler.HEAP_SNAPSHOT, profiler.JS_CONSTRUCTORS);
 	fastcgiStream.on("record", function() {
-		if(running) done++;
-		if(done == num) return;
+		done++;
+		if(done == num) {
+			profiler.pause();
+			var totalTime = Date.now() - startTime;
+			console.log("Read " + done + " records in " + totalTime + "ms");
+			console.log("This is " + (done / (totalTime / 1000)) + " records per second.");
+			readStream.pause();
+		}
 	});
-	
-	setTimeout(function() {
-		running = false;
-		
-		//profiler.pause();
-		console.log("Read " + done + " records.");
-		readStream.pause();
-	}, 1000);
 
 	readStream.resume();
+	startTime = Date.now();
 };
 
-runTest(function() { return new fastcgi.records.BeginRequest(112312313, 123) }, 1000);
+runTest(function() { return new fastcgi.records.BeginRequest(112312313, 123) }, 5000);
 //var myParams = [["LOLOLOLOLOL", "HAHAHAHA"], ["LOLOLOLOLOL", "HAHAHAHA"], ["LOLOLOLOLOL", "HAHAHAHA"], ["LOLOLOLOLOL", "HAHAHAHA"], ["LOLOLOLOLOL", "HAHAHAHA"]];
 //runTest(function() { return new fastcgi.records.Params(myParams); }, 10000);
