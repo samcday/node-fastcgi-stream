@@ -53,10 +53,77 @@ All record objects live in the `fastcgi.records` namespace. Each record will now
 
 Constructor args are never mandatory, you can pass as many or as few arguments as you like.
 
-## BeginRequest
+### BeginRequest
 
 	var record = new fastcgi.records.BeginRequest(role, flags);
 	
-* `.role` - the role being requested
+* `.role` - the role being requested. Possible roles as follows:
+	* `fastcgi.records.BeginRequest.roles.RESPONDER`
+	* `fastcgi.records.BeginRequest.roles.AUTHORIZER`
+	* `fastcgi.records.BeginRequest.roles.FILTER`
 * `.flags` - additional flags for the request. There is only one in the specification:
 	* `fastcgi.records.BeginRequest.flags.KEEP_CONN`
+	
+### AbortRequest
+
+	var record = new fastcgi.records.AbortRequest();
+	
+### EndRequest
+
+	var record = new fastcgi.records.EndRequest(appStatus, protocolStatus);
+	
+* `.appStatus` - application return status code
+* `.protocolStatus` - protocol return status code, can be one of the following:
+	* `fastcgi.records.EndRequest.protocolStatus.REQUEST_COMPLETE`
+	* `fastcgi.records.EndRequest.protocolStatus.CANT_MPX_CONN`
+	* `fastcgi.records.EndRequest.protocolStatus.OVERLOADED` 
+	* `fastcgi.records.EndRequest.protocolStatus.UNKNOWN_ROLE`
+	
+### Params
+
+	var params = [
+		["Name", "Value"],
+		["AnotherName", "AnotherValue"]
+	];
+	
+	// Params is optional.
+	var record = new fastcgi.records.Params(params);
+	
+`.params` - an array of name/value array pairs
+
+### StdIn/StdOut/StdErr/Data
+
+All of these records take the same constructor and have the same properties.
+
+	var body = "String";
+	var record = new fastcgi.records.StdIn(body);
+
+	// .. or ..
+
+	var body = new Buffer("Contents.");
+	var record = new fastcgi.records.StdIn(body);
+	
+### GetValues
+
+	var values = ["Name", "AnotherName"];
+	var record = new fastcgi.records.GetValues(values);
+	
+`.values` - array of values being requested
+
+### GetValuesResult
+
+	var result = [
+		["Name", "Value"],
+		["AnotherName", "AnotherValue"]
+	];
+
+	var record = new fastcgi.records.GetValuesResult(result);
+	
+`.result` - array of name/value pairs representing the result.
+
+### UnknownType
+
+	var record = new fastcgi.records.UnknownType(type);
+	
+`.type` - the type of record that was not recognized.
+
