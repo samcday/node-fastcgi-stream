@@ -15,5 +15,8 @@
 	"repository" : {
         "type" : "git",
          "url" : "https://github.com/samcday/node-fastcgi-stream.git"
+    },
+    "scripts": {
+    	"test": "vows test/fastcgi.test.js --spec"
     }
 }
