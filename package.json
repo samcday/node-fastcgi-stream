@@ -1,6 +1,6 @@
 {
 	"name": "fastcgi-stream",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Fast FastCGI Stream wrapper for reading/writing FCGI records.",
 	"keywords": "fcgi, fastcgi",
 	"author": "Sam Day <sam.c.day@gmail.com>",
