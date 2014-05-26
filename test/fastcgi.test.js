@@ -132,6 +132,14 @@ vows.describe("FastCGIStream Sanity Checks").addBatch({
 		},
 		expectedSize: 280
 	}),
+
+	"Params (with unicode values)": createRecordSanityChecks({
+		class: fastcgi.records.Params,
+		values: {
+			params: [["Параметр", "Значение"]]
+		},
+		expectedSize: 34
+	}),
 	
 	"StdIn (no data)": createRecordSanityChecks({
 		class: fastcgi.records.StdIn,
