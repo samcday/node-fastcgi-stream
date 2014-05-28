@@ -128,3 +128,7 @@ All of these records take the same constructor and have the same properties.
 	
 `.type` - the type of record that was not recognized.
 
+
+# License
+
+node-fastcgi-stream is free and unencumbered public domain software. For more information, see the accompanying UNLICENSE file.
