@@ -1,23 +1,25 @@
 {
-	"name": "fastcgi-stream",
-	"version": "0.1.1",
-    "license": "Unlicense",
-	"description": "Fast FastCGI Stream wrapper for reading/writing FCGI records.",
-	"keywords": "fcgi, fastcgi",
-	"author": "Sam Day <sam.c.day@gmail.com>",
-	"main": "./lib/index.js",
-	"engines": { "node": ">= 0.4.0" },
-	"dependencies": {
-		"vows": ">= 0.5.6",
-		"bufferlist": ">= 0.0.6",
-		"stream-buffers": ">= 0.2.1",
-		"duplex-stream": ">= 0.1.0"
-	},
-	"repository" : {
-        "type" : "git",
-         "url" : "https://github.com/samcday/node-fastcgi-stream.git"
-    },
-    "scripts": {
-    	"test": "vows test/fastcgi.test.js --spec"
-    }
+  "name": "fastcgi-stream",
+  "version": "0.1.2",
+  "license": "Unlicense",
+  "description": "Fast FastCGI Stream wrapper for reading/writing FCGI records.",
+  "keywords": "fcgi, fastcgi",
+  "author": "Sam Day <sam.c.day@gmail.com>",
+  "main": "./lib/index.js",
+  "engines": {
+    "node": ">= 0.4.0"
+  },
+  "dependencies": {
+    "vows": ">= 0.5.6",
+    "bufferlist": ">= 0.0.6",
+    "stream-buffers": ">= 0.2.1",
+    "duplex-stream": ">= 0.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samcday/node-fastcgi-stream.git"
+  },
+  "scripts": {
+    "test": "vows test/fastcgi.test.js --spec"
+  }
 }
