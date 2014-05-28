@@ -132,6 +132,22 @@ vows.describe("FastCGIStream Sanity Checks").addBatch({
 		},
 		expectedSize: 280
 	}),
+
+	"Params (with unicode values)": createRecordSanityChecks({
+		class: fastcgi.records.Params,
+		values: {
+			params: [["Параметр", "Значение"]]
+		},
+		expectedSize: 1 + 16 + 1 + 16
+	}),
+	
+	"Params (with unicode lagre values)": createRecordSanityChecks({
+		class: fastcgi.records.Params,
+		values: {
+			params: [["Параметр", "Очень-очень-длинное-значение-которое-явно-больше-ста-двадцати-семи-байт-в-длину"]]
+		},
+		expectedSize: 1 + 16 + 4 + 146
+	}),
 	
 	"StdIn (no data)": createRecordSanityChecks({
 		class: fastcgi.records.StdIn,
@@ -337,11 +353,13 @@ var createRecordBodyTests = function(record, deferredContentLengthFn) {
 				if(!Array.isArray(param)) param = [param, ""];
 				
 				var keySize, valueSize, paramSize = 0;
-
-				paramSize += (param[0].length > 127) ? 4 : 1;
-				paramSize += (param[1].length > 127) ? 4 : 1;
-				keySize = param[0].length;
-				valueSize = param[1].length;
+                var lengths = param.map(function (element) {
+                    return Buffer.byteLength(element);
+                });
+				paramSize += (lengths[0] > 127) ? 4 : 1;
+				paramSize += (lengths[1] > 127) ? 4 : 1;
+				keySize = lengths[0];
+				valueSize = lengths[1];
 				
 				paramSize += keySize + valueSize;
 				paramSizes.push(paramSize);
@@ -658,6 +676,8 @@ var largeShort = 0xFFFF;
 var largeInt32 = 4294967295;
 var smallParams = [["Test", "Value"], ["AnotherTest", "AnotherValue"]];
 var largeParams = [["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah"], ["AnotherTest", "AnotherValue"]];
+var smallUnicodeParams = [["Параметр", "Значение"]];
+var largeUnicodeParams = [["Параметр", "Очень-очень-длинное-значение-которое-явно-больше-ста-двадцати-семи-байт-в-длину"]];
 var smallKeys = ["Test", "Value", "AnotherTest", "AnotherValue"];
 var largeKeys = ["ThisIsAReallyLongHeaderNameItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "ThisIsAReallyLongHeaderValueItIsGoingToExceedOneHundredAndTwentySevenBytesJustYouWatchAreYouReadyOkHereWeGoBlahBlahBlahBlahBlahBlah", "AnotherTest", "AnotherValue"]; 
 var basicString = "Basic String";
@@ -679,6 +699,8 @@ vows.describe("FastCGIStream Writing").addBatch({
 	"Writing an FCGI_PARAMS (empty)": createWriteRecordTest(new fastcgi.records.Params()),
 	"Writing an FCGI_PARAMS (small name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(smallParams)),
 	"Writing an FCGI_PARAMS (large name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(largeParams)),
+	"Writing an FCGI_PARAMS (small unicode name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(smallUnicodeParams)),
+	"Writing an FCGI_PARAMS (large unicode name/value pairs)": createWriteRecordTest(new fastcgi.records.Params(largeUnicodeParams)),
 	"Writing an FCGI_STDIN (empty)": createWriteRecordTest(new fastcgi.records.StdIn()),
 	"Writing an FCGI_STDIN (string)": createWriteRecordTest(new fastcgi.records.StdIn(basicString)),
 	"Writing an FCGI_STDIN (unicode string)": createWriteRecordTest(new fastcgi.records.StdIn(unicodeString)),
