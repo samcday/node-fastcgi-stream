@@ -1,6 +1,8 @@
 # FastCGI Stream Lib
 
-[![build status](http://img.shields.io/travis/samcday/node-fastcgi-stream.png?style=flat-square)](http://travis-ci.org/samcday/node-fastcgi-stream)
+[![Build Status][badge-travis-img]][badge-travis-url]
+[![Code Quality][badge-climate-img]][badge-coverage-url]
+[![Test Coverage][badge-coverage-img]][badge-coverage-url]
 
 Read/write FastCGI records from a stream. Like a boss.
 
@@ -133,3 +135,10 @@ All of these records take the same constructor and have the same properties.
 # License
 
 node-fastcgi-stream is free and unencumbered public domain software. For more information, see the accompanying UNLICENSE file.
+
+[badge-travis-img]: https://img.shields.io/travis/samcday/node-fastcgi-stream.png?style=flat-square
+[badge-travis-url]: https://travis-ci.org/samcday/node-fastcgi-stream
+[badge-climate-img]: https://img.shields.io/codeclimate/github/samcday/node-fastcgi-stream.png?style=flat-square
+[badge-climate-url]: https://codeclimate.com/github/samcday/node-fastcgi-stream
+[badge-coverage-img]: https://img.shields.io/codeclimate/coverage/github/samcday/node-fastcgi-stream.png?style=flat-square
+[badge-coverage-url]: https://codeclimate.com/github/samcday/node-fastcgi-stream
