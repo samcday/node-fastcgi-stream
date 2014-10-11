@@ -1,6 +1,6 @@
-[![build status](http://img.shields.io/travis/samcday/node-fastcgi-stream.png?style=flat-square)](http://travis-ci.org/samcday/node-fastcgi-stream)
-
 # FastCGI Stream Lib
+
+[![build status](http://img.shields.io/travis/samcday/node-fastcgi-stream.png?style=flat-square)](http://travis-ci.org/samcday/node-fastcgi-stream)
 
 Read/write FastCGI records from a stream. Like a boss.
 
