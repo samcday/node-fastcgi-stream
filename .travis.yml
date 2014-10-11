@@ -1,4 +1,20 @@
 language: node_js
-node_js:
-  - 0.6
-  - 0.8
+
+matrix:
+  include:
+    - node_js: '0.6'
+      env: NO_COVERAGE=1
+    - node_js: '0.8'
+      env: NO_COVERAGE=1
+    - node_js: '0.10'
+    - node_js: '0.11'
+      env: NO_COVERAGE=1
+
+addons:
+  code_climate:
+    repo_token:
+      secure: "goYYAuK21Q29GJEOTgmDNYJxUntJ6fip4WQTYUToPgeFUGg4Cm2gcL+7AW0sbdDqob/NXBLnoeWhJM+trjCY+J8Atsn+m0rTZBcZQ1QVPJg4XGXw9Zxe5Budv2CbAGaU4BMZnIjrUZgcXaO60FqHoHbba4O4CrVEDHCKnmqd06A="
+
+after_script:
+  - npm install -g codeclimate-test-reporter
+  - cat coverage/lcov.info | codeclimate

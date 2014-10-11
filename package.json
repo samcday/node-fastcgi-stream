@@ -17,7 +17,7 @@
     "url": "https://github.com/samcday/node-fastcgi-stream.git"
   },
   "scripts": {
-    "test": "istanbul cover vows -- test/fastcgi.test.js --spec"
+    "test": "[ -n \"$NO_COVERAGE\" ] && vows -- test/fastcgi.test.js --spec || istanbul cover vows -- test/fastcgi.test.js --spec"
   },
   "devDependencies": {
     "istanbul": "~0.3.2",
