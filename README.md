@@ -1,16 +1,14 @@
-# FastCGI Stream Lib
+# fastcgi-stream
 
 [![Build Status][badge-travis-img]][badge-travis-url]
 [![Code Quality][badge-climate-img]][badge-coverage-url]
 [![Test Coverage][badge-coverage-img]][badge-coverage-url]
 
-Read/write FastCGI records from a stream. Like a boss.
+Read/write FastCGI records from a Node.js [Stream][node-docs-stream]. Like a boss.
 
 # Installation
 
-npm.
-
-	npm install fastcgi-stream
+[![NPM info][badge-npm-img]][badge-npm-url]
 
 # Usage
 
@@ -142,3 +140,6 @@ node-fastcgi-stream is free and unencumbered public domain software. For more in
 [badge-climate-url]: https://codeclimate.com/github/samcday/node-fastcgi-stream
 [badge-coverage-img]: https://img.shields.io/codeclimate/coverage/github/samcday/node-fastcgi-stream.png?style=flat-square
 [badge-coverage-url]: https://codeclimate.com/github/samcday/node-fastcgi-stream
+[badge-npm-img]: https://nodei.co/npm/fastcgi-stream.png?downloads=true&downloadRank=true&stars=true
+[badge-npm-url]: https://npmjs.org/package/fastcgi-stream
+[node-docs-stream]: http://nodejs.org/api/stream.html
