@@ -6,7 +6,7 @@
 [![Test Coverage][badge-coverage-img]][badge-coverage-url]
 [![npmjs.org][badge-npm-img]][badge-npm-url]
 
-Read/write FastCGI records from a Node.js [Stream][node-docs-stream], like a boss.
+Read & write FastCGI records from a node.js stream like a boss.
 
 ## Quickstart
 
