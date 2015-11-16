@@ -2,7 +2,6 @@
 
 [![Build Status][badge-travis-img]][badge-travis-url]
 [![Dependency Information][badge-david-img]][badge-david-url]
-[![Dependency Information][badge-david-dev-img]][badge-david-dev-url]
 [![Code Climate][badge-climate-img]][badge-climate-url]
 [![Test Coverage][badge-coverage-img]][badge-coverage-url]
 [![npmjs.org][badge-npm-img]][badge-npm-url]
@@ -149,8 +148,6 @@ node-fastcgi-stream is free and unencumbered public domain software. For more in
 [badge-travis-url]: https://travis-ci.org/samcday/node-fastcgi-stream
 [badge-david-img]: https://img.shields.io/david/samcday/node-fastcgi-stream.svg?style=flat-square
 [badge-david-url]: https://david-dm.org/samcday/node-fastcgi-stream
-[badge-david-dev-img]: https://img.shields.io/david/dev/samcday/node-fastcgi-stream.svg?style=flat-square
-[badge-david-dev-url]: https://david-dm.org/samcday/node-fastcgi-stream#info=devDependencies
 [badge-npm-img]: https://img.shields.io/npm/dm/fastcgi-stream.svg
 [badge-npm-url]: https://www.npmjs.org/package/fastcgi-stream
 [badge-climate-img]: https://img.shields.io/codeclimate/github/samcday/node-fastcgi-stream.svg?style=flat-square
