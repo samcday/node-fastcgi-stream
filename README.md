@@ -148,7 +148,7 @@ node-fastcgi-stream is free and unencumbered public domain software. For more in
 [badge-travis-url]: https://travis-ci.org/samcday/node-fastcgi-stream
 [badge-david-img]: https://img.shields.io/david/samcday/node-fastcgi-stream.svg?style=flat-square
 [badge-david-url]: https://david-dm.org/samcday/node-fastcgi-stream
-[badge-npm-img]: https://img.shields.io/npm/dm/fastcgi-stream.svg
+[badge-npm-img]: https://img.shields.io/npm/dm/fastcgi-stream.svg?style=flat-square
 [badge-npm-url]: https://www.npmjs.org/package/fastcgi-stream
 [badge-climate-img]: https://img.shields.io/codeclimate/github/samcday/node-fastcgi-stream.svg?style=flat-square
 [badge-climate-url]: https://codeclimate.com/github/samcday/node-fastcgi-stream
